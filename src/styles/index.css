@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 0 84.2% 60.2%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142.1 76.2% 36.3%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-gray-200;
+  }
+
+  body {
+    @apply bg-luxury-bg text-stone-900 antialiased font-sans;
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Neumorphic Shadows */
+  .neomorph-raised {
+    box-shadow: 8px 8px 16px rgba(163, 177, 198, 0.6),
+                -8px -8px 16px rgba(255, 255, 255, 0.9);
+  }
+
+  .neomorph-pressed {
+    box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.5),
+                inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+  }
+
+  .neomorph-card {
+    box-shadow: 12px 12px 24px rgba(163, 177, 198, 0.4),
+                -12px -12px 24px rgba(255, 255, 255, 0.7);
+  }
+
+  .neomorph-card-hover {
+    box-shadow: 16px 16px 32px rgba(163, 177, 198, 0.5),
+                -8px -8px 24px rgba(255, 255, 255, 0.8);
+  }
+
+  .neomorph-input {
+    box-shadow: inset 3px 3px 6px rgba(163, 177, 198, 0.4),
+                inset -3px -3px 6px rgba(255, 255, 255, 0.6);
+  }
+
+  .neomorph-button {
+    box-shadow: 6px 6px 12px rgba(163, 177, 198, 0.5),
+                -6px -6px 12px rgba(255, 255, 255, 0.8);
+  }
+
+  .neomorph-button-active {
+    box-shadow: inset 4px 4px 8px rgba(163, 177, 198, 0.6),
+                inset -2px -2px 6px rgba(255, 255, 255, 0.5);
+  }
+}
