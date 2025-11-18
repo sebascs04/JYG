@@ -94,6 +94,7 @@ function CatalogPage() {
       <CategoryNav
         activeCategory={activeCategory}
         onCategoryChange={setActiveCategory}
+        categories={categories}
       />
 
       {/* Main Content */}

@@ -1,6 +1,4 @@
-import { CATEGORIES } from '../../utils/constants';
-
-function CategoryNav({ activeCategory, onCategoryChange }) {
+function CategoryNav({ activeCategory, onCategoryChange, categories = [] }) {
   return (
     <div className="bg-luxury-bg border-b border-stone-200/50">
       <div className="max-w-7xl mx-auto px-8 lg:px-12">
@@ -24,7 +22,7 @@ function CategoryNav({ activeCategory, onCategoryChange }) {
           </button>
 
           {/* Category Tabs */}
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <button
               key={category.id}
               onClick={() => onCategoryChange(category.id)}
