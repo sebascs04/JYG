@@ -1,5 +1,4 @@
-import axiosInstance from './axios.config';
-import { API_ENDPOINTS } from '../utils/constants';
+import { supabase } from '../lib/supabase';
 
 /**
  * Get all products
@@ -7,8 +6,37 @@ import { API_ENDPOINTS } from '../utils/constants';
  * @returns {Promise} Response data
  */
 export const getProducts = async (params = {}) => {
-  const response = await axiosInstance.get(API_ENDPOINTS.PRODUCTS.LIST, { params });
-  return response.data;
+  let query = supabase
+    .from('products')
+    .select('*', { count: 'exact' });
+
+  // Apply category filter
+  if (params.category) {
+    query = query.eq('category', params.category);
+  }
+
+  // Apply pagination
+  const page = params.page || 1;
+  const limit = params.limit || 20;
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  query = query.range(from, to);
+
+  // Apply ordering
+  query = query.order('created_at', { ascending: false });
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
+
+  return {
+    products: data,
+    total: count,
+    page,
+    limit,
+    totalPages: Math.ceil(count / limit),
+  };
 };
 
 /**
@@ -17,8 +45,15 @@ export const getProducts = async (params = {}) => {
  * @returns {Promise} Response data
  */
 export const getProductById = async (id) => {
-  const response = await axiosInstance.get(API_ENDPOINTS.PRODUCTS.DETAIL(id));
-  return response.data;
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+
+  return { product: data };
 };
 
 /**
@@ -28,10 +63,41 @@ export const getProductById = async (id) => {
  * @returns {Promise} Response data
  */
 export const searchProducts = async (query, filters = {}) => {
-  const response = await axiosInstance.get(API_ENDPOINTS.PRODUCTS.SEARCH, {
-    params: { q: query, ...filters },
-  });
-  return response.data;
+  let supabaseQuery = supabase
+    .from('products')
+    .select('*', { count: 'exact' });
+
+  // Text search on name and description
+  if (query) {
+    supabaseQuery = supabaseQuery.or(
+      `name.ilike.%${query}%,description.ilike.%${query}%`
+    );
+  }
+
+  // Apply additional filters
+  if (filters.category) {
+    supabaseQuery = supabaseQuery.eq('category', filters.category);
+  }
+
+  if (filters.minPrice) {
+    supabaseQuery = supabaseQuery.gte('price', filters.minPrice);
+  }
+
+  if (filters.maxPrice) {
+    supabaseQuery = supabaseQuery.lte('price', filters.maxPrice);
+  }
+
+  // Apply ordering
+  supabaseQuery = supabaseQuery.order('created_at', { ascending: false });
+
+  const { data, error, count } = await supabaseQuery;
+
+  if (error) throw error;
+
+  return {
+    products: data,
+    total: count,
+  };
 };
 
 /**
@@ -41,8 +107,57 @@ export const searchProducts = async (query, filters = {}) => {
  * @returns {Promise} Response data
  */
 export const getProductsByCategory = async (categoryId, params = {}) => {
-  const response = await axiosInstance.get(API_ENDPOINTS.PRODUCTS.LIST, {
-    params: { category: categoryId, ...params },
-  });
-  return response.data;
+  return getProducts({ ...params, category: categoryId });
+};
+
+/**
+ * Create a new product (admin only)
+ * @param {object} productData - Product data
+ * @returns {Promise} Response data
+ */
+export const createProduct = async (productData) => {
+  const { data, error } = await supabase
+    .from('products')
+    .insert([productData])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return { product: data };
+};
+
+/**
+ * Update a product (admin only)
+ * @param {string} id - Product ID
+ * @param {object} productData - Updated product data
+ * @returns {Promise} Response data
+ */
+export const updateProduct = async (id, productData) => {
+  const { data, error } = await supabase
+    .from('products')
+    .update(productData)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return { product: data };
+};
+
+/**
+ * Delete a product (admin only)
+ * @param {string} id - Product ID
+ * @returns {Promise} Response data
+ */
+export const deleteProduct = async (id) => {
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+
+  return { success: true };
 };
