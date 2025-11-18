@@ -7,17 +7,25 @@ import { supabase } from '../lib/supabase';
  */
 export const getInventory = async (params = {}) => {
   let query = supabase
-    .from('products')
-    .select('*', { count: 'exact' });
+    .from('productos')
+    .select(`
+      *,
+      categorias (
+        id_categoria,
+        nombre,
+        activa
+      )
+    `, { count: 'exact' })
+    .eq('activo', true);
 
   // Apply category filter
   if (params.category) {
-    query = query.eq('category', params.category);
+    query = query.eq('id_categoria', params.category);
   }
 
   // Apply low stock filter
   if (params.lowStock !== undefined) {
-    query = query.lte('stock', params.lowStock);
+    query = query.lte('stock_actual', params.lowStock);
   }
 
   // Apply pagination
@@ -29,14 +37,30 @@ export const getInventory = async (params = {}) => {
   query = query.range(from, to);
 
   // Apply ordering
-  query = query.order('stock', { ascending: true });
+  query = query.order('stock_actual', { ascending: true });
 
   const { data, error, count } = await query;
 
   if (error) throw error;
 
+  // Transform data to match frontend expectations
+  const transformedItems = data.map(product => ({
+    id: product.id_producto,
+    id_producto: product.id_producto,
+    name: product.nombre,
+    description: product.descripcion,
+    price: parseFloat(product.precio_unitario),
+    stock: parseFloat(product.stock_actual),
+    category: product.categorias?.nombre || '',
+    id_categoria: product.id_categoria,
+    image: product.imagen_url,
+    sku: product.sku,
+    unidad_medida: product.unidad_medida,
+    activo: product.activo,
+  }));
+
   return {
-    items: data,
+    items: transformedItems,
     total: count,
     page,
     limit,
@@ -51,13 +75,17 @@ export const getInventory = async (params = {}) => {
  * @returns {Promise} Response data
  */
 export const updateInventory = async (id, updateData) => {
+  const dbUpdate = {};
+
+  if (updateData.stock !== undefined) dbUpdate.stock_actual = updateData.stock;
+  if (updateData.stock_actual !== undefined) dbUpdate.stock_actual = updateData.stock_actual;
+  if (updateData.price !== undefined) dbUpdate.precio_unitario = updateData.price;
+  if (updateData.precio_unitario !== undefined) dbUpdate.precio_unitario = updateData.precio_unitario;
+
   const { data, error } = await supabase
-    .from('products')
-    .update({
-      ...updateData,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+    .from('productos')
+    .update(dbUpdate)
+    .eq('id_producto', id)
     .select()
     .single();
 
@@ -73,14 +101,38 @@ export const updateInventory = async (id, updateData) => {
  */
 export const getLowStockItems = async (threshold = 10) => {
   const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .lte('stock', threshold)
-    .order('stock', { ascending: true });
+    .from('productos')
+    .select(`
+      *,
+      categorias (
+        id_categoria,
+        nombre,
+        activa
+      )
+    `)
+    .eq('activo', true)
+    .lte('stock_actual', threshold)
+    .order('stock_actual', { ascending: true });
 
   if (error) throw error;
 
-  return { items: data };
+  // Transform data to match frontend expectations
+  const transformedItems = data.map(product => ({
+    id: product.id_producto,
+    id_producto: product.id_producto,
+    name: product.nombre,
+    description: product.descripcion,
+    price: parseFloat(product.precio_unitario),
+    stock: parseFloat(product.stock_actual),
+    category: product.categorias?.nombre || '',
+    id_categoria: product.id_categoria,
+    image: product.imagen_url,
+    sku: product.sku,
+    unidad_medida: product.unidad_medida,
+    activo: product.activo,
+  }));
+
+  return { items: transformedItems };
 };
 
 /**
@@ -92,14 +144,14 @@ export const getLowStockItems = async (threshold = 10) => {
 export const adjustStock = async (id, quantity) => {
   // Get current stock
   const { data: product, error: getError } = await supabase
-    .from('products')
-    .select('stock')
-    .eq('id', id)
+    .from('productos')
+    .select('stock_actual')
+    .eq('id_producto', id)
     .single();
 
   if (getError) throw getError;
 
-  const newStock = product.stock + quantity;
+  const newStock = parseFloat(product.stock_actual) + quantity;
 
   if (newStock < 0) {
     throw new Error('Stock cannot be negative');
@@ -107,12 +159,11 @@ export const adjustStock = async (id, quantity) => {
 
   // Update stock
   const { data, error } = await supabase
-    .from('products')
+    .from('productos')
     .update({
-      stock: newStock,
-      updated_at: new Date().toISOString(),
+      stock_actual: newStock,
     })
-    .eq('id', id)
+    .eq('id_producto', id)
     .select()
     .single();
 
@@ -127,31 +178,41 @@ export const adjustStock = async (id, quantity) => {
  */
 export const getInventoryStats = async () => {
   const { data, error } = await supabase
-    .from('products')
-    .select('stock, price, category');
+    .from('productos')
+    .select(`
+      stock_actual,
+      precio_unitario,
+      categorias (
+        nombre
+      )
+    `)
+    .eq('activo', true);
 
   if (error) throw error;
 
   const stats = {
     totalProducts: data.length,
-    totalValue: data.reduce((sum, item) => sum + (item.stock * item.price), 0),
-    lowStockCount: data.filter(item => item.stock <= 10).length,
-    outOfStockCount: data.filter(item => item.stock === 0).length,
+    totalValue: data.reduce((sum, item) => {
+      return sum + (parseFloat(item.stock_actual) * parseFloat(item.precio_unitario));
+    }, 0),
+    lowStockCount: data.filter(item => parseFloat(item.stock_actual) <= 10).length,
+    outOfStockCount: data.filter(item => parseFloat(item.stock_actual) === 0).length,
     byCategory: {},
   };
 
   // Group by category
   data.forEach(item => {
-    if (!stats.byCategory[item.category]) {
-      stats.byCategory[item.category] = {
+    const categoryName = item.categorias?.nombre || 'Sin categoría';
+    if (!stats.byCategory[categoryName]) {
+      stats.byCategory[categoryName] = {
         count: 0,
         totalStock: 0,
         totalValue: 0,
       };
     }
-    stats.byCategory[item.category].count++;
-    stats.byCategory[item.category].totalStock += item.stock;
-    stats.byCategory[item.category].totalValue += (item.stock * item.price);
+    stats.byCategory[categoryName].count++;
+    stats.byCategory[categoryName].totalStock += parseFloat(item.stock_actual);
+    stats.byCategory[categoryName].totalValue += (parseFloat(item.stock_actual) * parseFloat(item.precio_unitario));
   });
 
   return { stats };

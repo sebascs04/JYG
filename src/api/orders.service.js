@@ -1,30 +1,36 @@
 import { supabase } from '../lib/supabase';
 
 /**
- * Get all orders
+ * Get all orders/pedidos
  * @param {object} params - Query parameters (page, limit, status, userId, etc.)
  * @returns {Promise} Response data
  */
 export const getOrders = async (params = {}) => {
   let query = supabase
-    .from('orders')
+    .from('pedidos')
     .select(`
       *,
-      order_items (
+      cliente:clientes!id_cliente (*),
+      estado:estados_pedido!id_estado_actual (*),
+      direccion:direcciones_cliente!id_direccion_entrega (*),
+      repartidor:trabajadores!id_repartidor_asignado (*),
+      detalle_pedidos (
         *,
-        product:products (*)
-      ),
-      profile:profiles (*)
+        producto:productos (
+          *,
+          categorias (*)
+        )
+      )
     `, { count: 'exact' });
 
   // Apply status filter
   if (params.status) {
-    query = query.eq('status', params.status);
+    query = query.eq('id_estado_actual', params.status);
   }
 
   // Apply user filter
   if (params.userId) {
-    query = query.eq('user_id', params.userId);
+    query = query.eq('id_cliente', params.userId);
   }
 
   // Apply pagination
@@ -36,14 +42,49 @@ export const getOrders = async (params = {}) => {
   query = query.range(from, to);
 
   // Apply ordering
-  query = query.order('created_at', { ascending: false });
+  query = query.order('fecha_pedido', { ascending: false });
 
   const { data, error, count } = await query;
 
   if (error) throw error;
 
+  // Transform to match frontend expectations
+  const transformedOrders = data.map(pedido => ({
+    id: pedido.id_pedido,
+    id_pedido: pedido.id_pedido,
+    codigo_pedido: pedido.codigo_pedido,
+    id_cliente: pedido.id_cliente,
+    cliente: pedido.cliente,
+    status: pedido.estado?.nombre_estado || 'pending',
+    estado: pedido.estado,
+    subtotal: parseFloat(pedido.subtotal),
+    shipping: parseFloat(pedido.costo_envio),
+    total: parseFloat(pedido.total),
+    created_at: pedido.fecha_pedido,
+    fecha_pedido: pedido.fecha_pedido,
+    observaciones_cliente: pedido.observaciones_cliente,
+    direccion_entrega: pedido.direccion,
+    repartidor: pedido.repartidor,
+    items: pedido.detalle_pedidos?.map(detalle => ({
+      id: detalle.id_detalle,
+      product_id: detalle.id_producto,
+      quantity: parseFloat(detalle.cantidad),
+      price: parseFloat(detalle.precio_historico),
+      subtotal: parseFloat(detalle.subtotal),
+      product: detalle.producto ? {
+        id: detalle.producto.id_producto,
+        name: detalle.producto.nombre,
+        description: detalle.producto.descripcion,
+        price: parseFloat(detalle.producto.precio_unitario),
+        stock: parseFloat(detalle.producto.stock_actual),
+        image: detalle.producto.imagen_url,
+        category: detalle.producto.categorias?.nombre,
+      } : null,
+    })) || [],
+  }));
+
   return {
-    orders: data,
+    orders: transformedOrders,
     total: count,
     page,
     limit,
@@ -58,44 +99,71 @@ export const getOrders = async (params = {}) => {
  */
 export const getOrderById = async (id) => {
   const { data, error } = await supabase
-    .from('orders')
+    .from('pedidos')
     .select(`
       *,
-      order_items (
+      cliente:clientes!id_cliente (*),
+      estado:estados_pedido!id_estado_actual (*),
+      direccion:direcciones_cliente!id_direccion_entrega (*),
+      repartidor:trabajadores!id_repartidor_asignado (*),
+      detalle_pedidos (
         *,
-        product:products (*)
-      ),
-      profile:profiles (*)
+        producto:productos (
+          *,
+          categorias (*)
+        )
+      )
     `)
-    .eq('id', id)
+    .eq('id_pedido', id)
     .single();
 
   if (error) throw error;
 
-  return { order: data };
+  // Transform to match frontend expectations
+  const order = {
+    id: data.id_pedido,
+    id_pedido: data.id_pedido,
+    codigo_pedido: data.codigo_pedido,
+    id_cliente: data.id_cliente,
+    cliente: data.cliente,
+    status: data.estado?.nombre_estado || 'pending',
+    estado: data.estado,
+    subtotal: parseFloat(data.subtotal),
+    shipping: parseFloat(data.costo_envio),
+    total: parseFloat(data.total),
+    created_at: data.fecha_pedido,
+    fecha_pedido: data.fecha_pedido,
+    observaciones_cliente: data.observaciones_cliente,
+    direccion_entrega: data.direccion,
+    repartidor: data.repartidor,
+    items: data.detalle_pedidos?.map(detalle => ({
+      id: detalle.id_detalle,
+      product_id: detalle.id_producto,
+      quantity: parseFloat(detalle.cantidad),
+      price: parseFloat(detalle.precio_historico),
+      subtotal: parseFloat(detalle.subtotal),
+      product: detalle.producto ? {
+        id: detalle.producto.id_producto,
+        name: detalle.producto.nombre,
+        description: detalle.producto.descripcion,
+        price: parseFloat(detalle.producto.precio_unitario),
+        stock: parseFloat(detalle.producto.stock_actual),
+        image: detalle.producto.imagen_url,
+        category: detalle.producto.categorias?.nombre,
+      } : null,
+    })) || [],
+  };
+
+  return { order };
 };
 
 /**
  * Get user orders
- * @param {string} userId - User ID
+ * @param {string} userId - User ID (id_cliente)
  * @returns {Promise} Response data
  */
 export const getUserOrders = async (userId) => {
-  const { data, error } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
-        *,
-        product:products (*)
-      )
-    `)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  return { orders: data };
+  return getOrders({ userId });
 };
 
 /**
@@ -108,69 +176,99 @@ export const createOrder = async (orderData) => {
 
   if (!user) throw new Error('User not authenticated');
 
+  // Get cliente ID
+  const { data: cliente } = await supabase
+    .from('clientes')
+    .select('id_cliente')
+    .eq('email', user.email)
+    .single();
+
+  if (!cliente) throw new Error('Cliente not found');
+
   // Calculate totals
   const subtotal = orderData.items.reduce(
     (sum, item) => sum + (item.price * item.quantity),
     0
   );
-  const shipping = 5.00; // Fixed shipping cost
+  const shipping = orderData.shipping || 5.00;
   const total = subtotal + shipping;
 
-  // Create order
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
+  // Generate unique order code
+  const codigo_pedido = `PED-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+  // Get direccion_entrega ID or create one
+  let id_direccion_entrega = orderData.id_direccion_entrega;
+
+  if (!id_direccion_entrega && orderData.shippingAddress) {
+    const { data: newDireccion, error: direccionError } = await supabase
+      .from('direcciones_cliente')
+      .insert([
+        {
+          id_cliente: cliente.id_cliente,
+          direccion_completa: orderData.shippingAddress.address || orderData.shippingAddress.direccion_completa,
+          referencia: orderData.shippingAddress.reference || orderData.shippingAddress.referencia,
+          ciudad: orderData.shippingAddress.city || orderData.shippingAddress.ciudad || 'Lima',
+          codigo_postal: orderData.shippingAddress.zip || orderData.shippingAddress.codigo_postal,
+          alias: orderData.shippingAddress.alias || 'Principal',
+        },
+      ])
+      .select()
+      .single();
+
+    if (direccionError) throw direccionError;
+    id_direccion_entrega = newDireccion.id_direccion;
+  }
+
+  // Get estado "pending" ID
+  const { data: estadoPending } = await supabase
+    .from('estados_pedido')
+    .select('id_estado')
+    .eq('nombre_estado', 'Pendiente')
+    .single();
+
+  const id_estado_actual = estadoPending?.id_estado || 1;
+
+  // Create pedido
+  const { data: pedido, error: pedidoError } = await supabase
+    .from('pedidos')
     .insert([
       {
-        user_id: user.id,
-        status: 'pending',
+        codigo_pedido,
+        id_cliente: cliente.id_cliente,
+        id_direccion_entrega,
+        id_estado_actual,
         subtotal,
-        shipping,
+        costo_envio: shipping,
         total,
-        shipping_address: orderData.shippingAddress,
-        payment_method: orderData.paymentMethod,
-        notes: orderData.notes || null,
+        observaciones_cliente: orderData.notes || orderData.observaciones_cliente || null,
       },
     ])
     .select()
     .single();
 
-  if (orderError) throw orderError;
+  if (pedidoError) throw pedidoError;
 
-  // Create order items
-  const orderItems = orderData.items.map(item => ({
-    order_id: order.id,
-    product_id: item.productId,
-    quantity: item.quantity,
-    price: item.price,
-    subtotal: item.price * item.quantity,
+  // Create detalle_pedidos
+  const detalleItems = orderData.items.map(item => ({
+    id_pedido: pedido.id_pedido,
+    id_producto: item.productId || item.id_producto || item.product_id || item.id,
+    cantidad: item.quantity || item.cantidad,
+    precio_historico: item.price || item.precio,
+    // subtotal is auto-calculated by database
   }));
 
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItems);
+  const { error: detalleError } = await supabase
+    .from('detalle_pedidos')
+    .insert(detalleItems);
 
-  if (itemsError) {
-    // Rollback: delete the order if items creation fails
-    await supabase.from('orders').delete().eq('id', order.id);
-    throw itemsError;
+  if (detalleError) {
+    // Rollback: delete the pedido if items creation fails
+    await supabase.from('pedidos').delete().eq('id_pedido', pedido.id_pedido);
+    throw detalleError;
   }
 
-  // Get complete order with items
-  const { data: completeOrder, error: fetchError } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      order_items (
-        *,
-        product:products (*)
-      )
-    `)
-    .eq('id', order.id)
-    .single();
-
-  if (fetchError) throw fetchError;
-
-  return { order: completeOrder };
+  // Get complete order with relations
+  return getOrderById(pedido.id_pedido);
 };
 
 /**
@@ -180,25 +278,42 @@ export const createOrder = async (orderData) => {
  * @returns {Promise} Response data
  */
 export const updateOrder = async (id, updateData) => {
-  const { data, error } = await supabase
-    .from('orders')
-    .update({
-      ...updateData,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select(`
-      *,
-      order_items (
-        *,
-        product:products (*)
-      )
-    `)
-    .single();
+  const dbUpdate = {};
+
+  if (updateData.status !== undefined) {
+    // Get estado ID from nombre_estado
+    const { data: estado } = await supabase
+      .from('estados_pedido')
+      .select('id_estado')
+      .eq('nombre_estado', updateData.status)
+      .single();
+
+    if (estado) {
+      dbUpdate.id_estado_actual = estado.id_estado;
+    }
+  }
+
+  if (updateData.id_estado_actual !== undefined) {
+    dbUpdate.id_estado_actual = updateData.id_estado_actual;
+  }
+
+  if (updateData.id_repartidor_asignado !== undefined) {
+    dbUpdate.id_repartidor_asignado = updateData.id_repartidor_asignado;
+  }
+
+  if (updateData.observaciones_cliente !== undefined) {
+    dbUpdate.observaciones_cliente = updateData.observaciones_cliente;
+  }
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update(dbUpdate)
+    .eq('id_pedido', id);
 
   if (error) throw error;
 
-  return { order: data };
+  // Return updated order
+  return getOrderById(id);
 };
 
 /**
@@ -207,7 +322,14 @@ export const updateOrder = async (id, updateData) => {
  * @returns {Promise} Response data
  */
 export const cancelOrder = async (id) => {
-  return updateOrder(id, { status: 'cancelled' });
+  // Get estado "Cancelado" ID
+  const { data: estadoCancelado } = await supabase
+    .from('estados_pedido')
+    .select('id_estado')
+    .eq('nombre_estado', 'Cancelado')
+    .single();
+
+  return updateOrder(id, { id_estado_actual: estadoCancelado?.id_estado || 5 });
 };
 
 /**
@@ -216,27 +338,42 @@ export const cancelOrder = async (id) => {
  * @returns {Promise} Response data
  */
 export const processOrder = async (id) => {
-  return updateOrder(id, { status: 'processing' });
+  const { data: estado } = await supabase
+    .from('estados_pedido')
+    .select('id_estado')
+    .eq('nombre_estado', 'En Proceso')
+    .single();
+
+  return updateOrder(id, { id_estado_actual: estado?.id_estado || 2 });
 };
 
 /**
- * Update order status to shipped
+ * Update order status to shipped/en camino
  * @param {string} id - Order ID
- * @param {string} trackingNumber - Tracking number
+ * @param {string} trackingNumber - Tracking number (optional)
  * @returns {Promise} Response data
  */
 export const shipOrder = async (id, trackingNumber) => {
-  return updateOrder(id, {
-    status: 'shipped',
-    tracking_number: trackingNumber
-  });
+  const { data: estado } = await supabase
+    .from('estados_pedido')
+    .select('id_estado')
+    .eq('nombre_estado', 'En Camino')
+    .single();
+
+  return updateOrder(id, { id_estado_actual: estado?.id_estado || 3 });
 };
 
 /**
- * Update order status to delivered
+ * Update order status to delivered/entregado
  * @param {string} id - Order ID
  * @returns {Promise} Response data
  */
 export const deliverOrder = async (id) => {
-  return updateOrder(id, { status: 'delivered' });
+  const { data: estado } = await supabase
+    .from('estados_pedido')
+    .select('id_estado')
+    .eq('nombre_estado', 'Entregado')
+    .single();
+
+  return updateOrder(id, { id_estado_actual: estado?.id_estado || 4 });
 };

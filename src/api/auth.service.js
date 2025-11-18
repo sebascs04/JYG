@@ -13,23 +13,28 @@ export const login = async ({ email, password }) => {
 
   if (error) throw error;
 
-  // Get user profile from database
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+  // Get client profile from database
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
     .select('*')
-    .eq('id', data.user.id)
+    .eq('email', data.user.email)
     .single();
 
-  if (profileError) {
-    console.warn('Profile not found, using default data');
+  if (clienteError) {
+    console.warn('Cliente not found, using default data');
   }
 
   return {
     user: {
-      id: data.user.id,
+      id: cliente?.id_cliente || data.user.id,
+      id_cliente: cliente?.id_cliente,
       email: data.user.email,
-      role: profile?.role || 'customer',
-      ...profile,
+      nombre: cliente?.nombre,
+      apellido: cliente?.apellido,
+      telefono: cliente?.telefono,
+      role: 'customer', // Los clientes siempre son 'customer'
+      es_invitado: cliente?.es_invitado || false,
+      activo: cliente?.activo !== undefined ? cliente.activo : true,
     },
     token: data.session.access_token,
     session: data.session,
@@ -38,50 +43,66 @@ export const login = async ({ email, password }) => {
 
 /**
  * Register new user
- * @param {object} userData - User registration data (email, password, name, phone)
+ * @param {object} userData - User registration data (email, password, nombre, apellido, telefono)
  * @returns {Promise} Response data
  */
-export const register = async ({ email, password, name, phone, role = 'customer' }) => {
+export const register = async ({ email, password, nombre, apellido, telefono, name, phone }) => {
+  // Handle both naming conventions
+  const clienteNombre = nombre || (name ? name.split(' ')[0] : '');
+  const clienteApellido = apellido || (name ? name.split(' ').slice(1).join(' ') : '');
+  const clienteTelefono = telefono || phone || '';
+
   // Create auth user
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        name,
-        phone,
+        nombre: clienteNombre,
+        apellido: clienteApellido,
+        telefono: clienteTelefono,
       },
     },
   });
 
   if (authError) throw authError;
 
-  // Create user profile
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+  // Hash password for clientes table (in real app, this should be done server-side)
+  // For now, we'll skip password_hash since Supabase handles auth
+
+  // Create client profile
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
     .insert([
       {
-        id: authData.user.id,
+        nombre: clienteNombre,
+        apellido: clienteApellido,
         email,
-        name,
-        phone,
-        role,
+        telefono: clienteTelefono,
+        password_hash: 'handled_by_supabase_auth', // Placeholder
+        es_invitado: false,
+        activo: true,
       },
     ])
     .select()
     .single();
 
-  if (profileError) {
-    console.error('Error creating profile:', profileError);
-    // Continue even if profile creation fails
+  if (clienteError) {
+    console.error('Error creating cliente:', clienteError);
+    // Continue even if cliente creation fails
   }
 
   return {
     user: {
-      id: authData.user.id,
+      id: cliente?.id_cliente || authData.user.id,
+      id_cliente: cliente?.id_cliente,
       email: authData.user.email,
-      role: profile?.role || role,
-      ...profile,
+      nombre: cliente?.nombre || clienteNombre,
+      apellido: cliente?.apellido || clienteApellido,
+      telefono: cliente?.telefono || clienteTelefono,
+      role: 'customer',
+      es_invitado: false,
+      activo: true,
     },
     token: authData.session?.access_token,
     session: authData.session,
@@ -121,23 +142,28 @@ export const getCurrentUser = async () => {
   if (userError) throw userError;
   if (!user) throw new Error('No user logged in');
 
-  // Get user profile from database
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+  // Get client profile from database
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
     .select('*')
-    .eq('id', user.id)
+    .eq('email', user.email)
     .single();
 
-  if (profileError) {
-    console.warn('Profile not found');
+  if (clienteError) {
+    console.warn('Cliente not found');
   }
 
   return {
     user: {
-      id: user.id,
+      id: cliente?.id_cliente || user.id,
+      id_cliente: cliente?.id_cliente,
       email: user.email,
-      role: profile?.role || 'customer',
-      ...profile,
+      nombre: cliente?.nombre,
+      apellido: cliente?.apellido,
+      telefono: cliente?.telefono,
+      role: 'customer',
+      es_invitado: cliente?.es_invitado || false,
+      activo: cliente?.activo !== undefined ? cliente.activo : true,
     },
   };
 };

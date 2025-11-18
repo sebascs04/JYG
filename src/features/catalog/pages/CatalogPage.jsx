@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getProducts } from '../../../api/products.service';
-import { MOCK_PRODUCTS } from '../../../utils/constants';
+import { getCategories } from '../../../api/categories.service';
 import Header from '../../../components/layout/Header';
 import CategoryNav from '../../../components/catalog/CategoryNav';
 import ProductCard from '../../../components/catalog/ProductCard';
@@ -10,25 +10,47 @@ import { useCartStore } from '../../../store/useCartStore';
 
 function CatalogPage() {
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState(null);
+  const [error, setError] = useState(null);
   const { addItem } = useCartStore();
 
   useEffect(() => {
-    loadProducts();
+    loadData();
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [activeCategory]);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Load categories
+      const catData = await getCategories();
+      setCategories(catData.categories || []);
+
+      // Load initial products
+      await loadProducts();
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError('No se pudieron cargar los productos. Por favor, intenta de nuevo más tarde.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadProducts = async () => {
     try {
-      setIsLoading(true);
-      const data = await getProducts();
+      const params = activeCategory ? { category: activeCategory } : {};
+      const data = await getProducts(params);
       setProducts(data.products || []);
     } catch (error) {
       console.error('Error loading products:', error);
-      // Fallback to mock data if API fails
-      setProducts(MOCK_PRODUCTS);
-    } finally {
-      setIsLoading(false);
+      setError('Error al cargar los productos.');
     }
   };
 
@@ -36,16 +58,26 @@ function CatalogPage() {
     addItem(product);
   };
 
-  // Filter products by category
-  const filteredProducts = products.filter((product) => {
-    const matchesCategory = activeCategory === null || product.category === activeCategory;
-    return matchesCategory;
-  });
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-luxury-bg">
         <Spinner size="xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-luxury-bg">
+        <div className="text-center">
+          <p className="text-2xl font-serif text-red-600 mb-3">{error}</p>
+          <button
+            onClick={loadData}
+            className="px-6 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     );
   }
@@ -67,7 +99,7 @@ function CatalogPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-8 lg:px-12 py-20">
         {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
+        {products.length === 0 ? (
           <div className="text-center py-32">
             <p className="text-2xl font-serif text-stone-600 mb-3">
               No hay productos disponibles
@@ -82,17 +114,17 @@ function CatalogPage() {
             <div className="mb-16 text-center">
               <h2 className="text-4xl font-serif font-bold text-stone-900 mb-3">
                 {activeCategory
-                  ? `${activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)}`
+                  ? categories.find(c => c.id === activeCategory)?.name || 'Productos'
                   : 'Nuestra Colección'}
               </h2>
               <p className="text-stone-500 text-sm tracking-wide">
-                {filteredProducts.length} {filteredProducts.length === 1 ? 'producto' : 'productos'}
+                {products.length} {products.length === 1 ? 'producto' : 'productos'}
               </p>
             </div>
 
             {/* Products Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8 gap-y-12">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
