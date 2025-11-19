@@ -53,7 +53,7 @@ function AppRoutes() {
       </Route>
 
       {/* 404 */}
-      <Route path="*" element={<NotFoundPage />} />
+      <Route path="*" element={<LoginPage />} />
     </Routes>
   );
 }

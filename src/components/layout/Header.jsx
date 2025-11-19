@@ -17,15 +17,6 @@ function Header() {
             </h1>
           </Link>
 
-          {/* Navigation - Center (Optional) */}
-          <nav className="hidden md:flex items-center gap-12">
-            <Link
-              to="/catalog"
-              className="text-sm font-medium text-stone-600 hover:text-luxury-olive transition-all duration-500 tracking-wide uppercase"
-            >
-              Catálogo
-            </Link>
-          </nav>
 
           {/* Actions - Right */}
           <div className="flex items-center gap-8 flex-shrink-0">
