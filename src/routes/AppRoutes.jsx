@@ -21,6 +21,7 @@ import DashboardPage from '../features/admin/pages/DashboardPage';
 import OrdersPage from '../features/admin/pages/OrdersPage';
 import InventoryPage from '../features/admin/pages/InventoryPage';
 import DispatchPage from '../features/admin/pages/DispatchPage';
+import DeliveryPage from '../features/admin/pages/DeliveryPage';
 
 function AppRoutes() {
   return (
@@ -44,13 +45,32 @@ function AppRoutes() {
         <Route path="/order-success" element={<OrderSuccessPage />} />
       </Route>
 
-      {/* Admin Routes (Protected) */}
-      <Route element={<ProtectedRoute allowedRoles={['admin', 'employee']} />}>
+      {/* Admin Routes - Solo Admin (todo) */}
+      <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin/dashboard" element={<DashboardPage />} />
-          <Route path="/admin/orders" element={<OrdersPage />} />
           <Route path="/admin/inventory" element={<InventoryPage />} />
+        </Route>
+      </Route>
+
+      {/* Admin Routes - Recepcionista (pedidos) */}
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'recepcionista']} />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/orders" element={<OrdersPage />} />
+        </Route>
+      </Route>
+
+      {/* Admin Routes - Despachador (despacho) */}
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'despachador']} />}>
+        <Route element={<AdminLayout />}>
           <Route path="/admin/dispatch" element={<DispatchPage />} />
+        </Route>
+      </Route>
+
+      {/* Admin Routes - Repartidor (entregas) */}
+      <Route element={<ProtectedRoute allowedRoles={['admin', 'repartidor']} />}>
+        <Route element={<AdminLayout />}>
+          <Route path="/admin/delivery" element={<DeliveryPage />} />
         </Route>
       </Route>
 

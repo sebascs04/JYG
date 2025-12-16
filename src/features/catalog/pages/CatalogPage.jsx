@@ -26,17 +26,23 @@ function CatalogPage() {
 
   const loadData = async () => {
     try {
+      console.log('⏳ Iniciando carga de datos...');
+      const startTime = Date.now();
       setIsLoading(true);
       setError(null);
 
       // Load categories
+      console.log('📁 Cargando categorías...');
       const catData = await getCategories();
+      console.log(`✅ Categorías cargadas en ${Date.now() - startTime}ms`);
       setCategories(catData.categories || []);
 
       // Load initial products
+      console.log('📦 Cargando productos...');
       await loadProducts();
+      console.log(`✅ Todo cargado en ${Date.now() - startTime}ms`);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('❌ Error loading data:', error);
       setError('No se pudieron cargar los productos. Verifica tu conexión.');
       setProducts([]);
       setCategories([]);

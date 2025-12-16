@@ -5,24 +5,44 @@ import { supabase } from '../lib/supabase';
  * @returns {Promise} Response data with categories
  */
 export const getCategories = async () => {
-  const { data, error } = await supabase
+  console.log('🔗 Conectando a Supabase para categorías...');
+
+  // Timeout de 10 segundos
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Timeout: Supabase tardó más de 10s')), 10000)
+  );
+
+  const queryPromise = supabase
     .from('categorias')
     .select('*')
     .eq('activa', true)
     .order('nombre', { ascending: true });
 
-  if (error) throw error;
+  try {
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
 
-  // Transform data to match frontend expectations
-  const transformedCategories = data.map(category => ({
-    id: category.id_categoria,
-    id_categoria: category.id_categoria,
-    name: category.nombre,
-    nombre: category.nombre,
-    activa: category.activa,
-  }));
+    if (error) {
+      console.error('❌ Error de Supabase:', error);
+      throw error;
+    }
 
-  return { categories: transformedCategories };
+    console.log('✅ Categorías recibidas:', data?.length || 0);
+
+    // Transform data to match frontend expectations
+    const transformedCategories = (data || []).map(category => ({
+      id: category.id_categoria,
+      id_categoria: category.id_categoria,
+      name: category.nombre,
+      nombre: category.nombre,
+      activa: category.activa,
+    }));
+
+    return { categories: transformedCategories };
+  } catch (err) {
+    console.error('❌ Error en getCategories:', err.message);
+    // Retornar array vacío en vez de fallar
+    return { categories: [] };
+  }
 };
 
 /**

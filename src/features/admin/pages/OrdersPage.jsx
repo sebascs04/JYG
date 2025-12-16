@@ -2,20 +2,48 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuthStore } from '../../../store/useAuthStore';
 import Card from '../../../components/ui/Card';
-import Badge from '../../../components/ui/Badge';
-import Header from '../../../components/layout/Header';
+import Button from '../../../components/ui/Button';
+import Spinner from '../../../components/ui/Spinner';
 import { formatPrice } from '../../../utils/formatters';
-import { Package, Clock, Truck, CheckCircle, XCircle, Eye, ChevronDown } from 'lucide-react';
+import { Package, Clock, Truck, CheckCircle, Eye, ChevronDown, X, ChevronLeft, ChevronRight, MapPin, MessageSquare } from 'lucide-react';
 
-const ESTADOS = [
-  { value: 'Recibido', label: 'Recibido', color: 'blue', icon: Clock },
-  { value: 'Revisado', label: 'Revisado', color: 'purple', icon: Eye },
-  { value: 'Preparando', label: 'Preparando', color: 'yellow', icon: Package },
-  { value: 'Preparado', label: 'Preparado', color: 'orange', icon: Package },
-  { value: 'Enviando', label: 'Enviando', color: 'indigo', icon: Truck },
-  { value: 'Entregado', label: 'Entregado', color: 'green', icon: CheckCircle },
-  { value: 'Anulado', label: 'Anulado', color: 'red', icon: XCircle },
-];
+// Estados según la BD (id_estado_actual)
+const ESTADOS = {
+  1: { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  2: { label: 'Pagado', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
+  3: { label: 'En Preparación', color: 'bg-purple-100 text-purple-800', icon: Package },
+  4: { label: 'Listo', color: 'bg-orange-100 text-orange-800', icon: Package },
+  5: { label: 'En Camino', color: 'bg-cyan-100 text-cyan-800', icon: Truck },
+  6: { label: 'Entregado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
+};
+
+const ITEMS_PER_PAGE = 10;
+
+// Helper para parsear observaciones (puede ser JSON o texto plano)
+function parseObservaciones(obs) {
+  if (!obs) return { direccion: '', telefono: '', comentarios: '' };
+
+  try {
+    const parsed = JSON.parse(obs);
+    return {
+      direccion: parsed.direccion || '',
+      telefono: parsed.telefono || '',
+      comentarios: parsed.comentarios || '',
+    };
+  } catch {
+    // Si no es JSON, es formato antiguo (texto plano)
+    // Intentar extraer dirección si tiene el formato "Dirección: xxx. comentarios"
+    if (obs.startsWith('Dirección:')) {
+      const parts = obs.replace('Dirección:', '').split('.');
+      return {
+        direccion: parts[0]?.trim() || obs,
+        telefono: '',
+        comentarios: parts.slice(1).join('.').trim() || '',
+      };
+    }
+    return { direccion: '', telefono: '', comentarios: obs };
+  }
+}
 
 function OrdersPage() {
   const { user } = useAuthStore();
@@ -24,27 +52,49 @@ function OrdersPage() {
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
   const [detalles, setDetalles] = useState([]);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     fetchPedidos();
-  }, []);
+  }, [currentPage, filtroEstado]);
 
   async function fetchPedidos() {
     setLoading(true);
     try {
+      // Primero obtener el total
+      let countQuery = supabase
+        .from('pedidos')
+        .select('*', { count: 'exact', head: true });
+
+      if (filtroEstado !== 'todos') {
+        countQuery = countQuery.eq('id_estado_actual', parseInt(filtroEstado));
+      }
+
+      const { count } = await countQuery;
+      setTotalCount(count || 0);
+
+      // Luego obtener los datos paginados
+      const from = (currentPage - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
       let query = supabase
         .from('pedidos')
         .select(`
           *,
-          clientes (nombre, apellido, email, telefono)
+          clientes (nombre, apellido, email, telefono),
+          estados_pedido (nombre_estado)
         `)
-        .order('fecha_pedido', { ascending: false });
+        .order('fecha_pedido', { ascending: false })
+        .range(from, to);
 
-      // Empleados no ven Entregado ni Anulado
-      if (!isAdmin) {
-        query = query.not('estado', 'in', '("Entregado","Anulado")');
+      if (filtroEstado !== 'todos') {
+        query = query.eq('id_estado_actual', parseInt(filtroEstado));
       }
 
       const { data, error } = await query;
@@ -59,7 +109,7 @@ function OrdersPage() {
 
   async function fetchDetalles(idPedido) {
     const { data, error } = await supabase
-      .from('detalle_pedido')
+      .from('detalle_pedidos')
       .select(`
         *,
         productos (nombre, imagen_url)
@@ -73,22 +123,23 @@ function OrdersPage() {
 
   async function handleCambiarEstado(idPedido, nuevoEstado) {
     try {
+      setUpdatingId(idPedido);
+
       const { error } = await supabase
         .from('pedidos')
-        .update({ estado: nuevoEstado })
+        .update({ id_estado_actual: nuevoEstado })
         .eq('id_pedido', idPedido);
 
       if (error) throw error;
 
-      // Actualizar lista local
       setPedidos(pedidos.map(p =>
-        p.id_pedido === idPedido ? { ...p, estado: nuevoEstado } : p
+        p.id_pedido === idPedido ? { ...p, id_estado_actual: nuevoEstado } : p
       ));
-
-      alert(`Pedido #${idPedido} actualizado a: ${nuevoEstado}`);
     } catch (error) {
       console.error('Error updating estado:', error);
       alert('Error al actualizar el estado');
+    } finally {
+      setUpdatingId(null);
     }
   }
 
@@ -97,68 +148,64 @@ function OrdersPage() {
     fetchDetalles(pedido.id_pedido);
   }
 
-  const pedidosFiltrados = filtroEstado === 'todos'
-    ? pedidos
-    : pedidos.filter(p => p.estado === filtroEstado);
-
-  // Agrupar por estado para vista de tablero
-  const pedidosPorEstado = ESTADOS.reduce((acc, estado) => {
-    acc[estado.value] = pedidos.filter(p => p.estado === estado.value);
-    return acc;
-  }, {});
-
-  const getEstadoInfo = (estado) => ESTADOS.find(e => e.value === estado) || ESTADOS[0];
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Gestión de Pedidos
-          </h1>
-          <div className="flex gap-2">
-            <select
-              value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className="border rounded-lg px-4 py-2 bg-white"
-            >
-              <option value="todos">Todos los estados</option>
-              {ESTADOS.map(e => (
-                <option key={e.value} value={e.value}>{e.label}</option>
-              ))}
-            </select>
-          </div>
+    <div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Gestión de Pedidos</h1>
+        <div className="flex gap-2">
+          <select
+            value={filtroEstado}
+            onChange={(e) => {
+              setFiltroEstado(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="border rounded-lg px-4 py-2 bg-white"
+          >
+            <option value="todos">Todos los estados</option>
+            {Object.entries(ESTADOS).map(([id, estado]) => (
+              <option key={id} value={id}>{estado.label}</option>
+            ))}
+          </select>
+          <Button onClick={fetchPedidos} variant="outline">
+            Actualizar
+          </Button>
         </div>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-12">Cargando pedidos...</div>
-        ) : pedidosFiltrados.length === 0 ? (
-          <Card>
-            <Card.Body>
-              <div className="text-center py-12 text-gray-500">
-                No hay pedidos {filtroEstado !== 'todos' ? `en estado "${filtroEstado}"` : ''}
-              </div>
-            </Card.Body>
-          </Card>
-        ) : (
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <Spinner size="lg" />
+        </div>
+      ) : pedidos.length === 0 ? (
+        <Card>
+          <Card.Body>
+            <div className="text-center py-12 text-gray-500">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No hay pedidos {filtroEstado !== 'todos' ? `en estado "${ESTADOS[filtroEstado]?.label}"` : ''}</p>
+            </div>
+          </Card.Body>
+        </Card>
+      ) : (
+        <>
           <div className="grid gap-4">
-            {pedidosFiltrados.map((pedido) => {
-              const estadoInfo = getEstadoInfo(pedido.estado);
+            {pedidos.map((pedido) => {
+              const estadoInfo = ESTADOS[pedido.id_estado_actual] || ESTADOS[1];
               const Icon = estadoInfo.icon;
+              const obsData = parseObservaciones(pedido.observaciones_cliente);
 
               return (
                 <Card key={pedido.id_pedido} className="hover:shadow-md transition-shadow">
                   <Card.Body>
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       {/* Info del pedido */}
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <span className="text-xl font-bold text-gray-900">
-                            Pedido #{pedido.id_pedido}
+                            {pedido.codigo_pedido || `#${pedido.id_pedido}`}
                           </span>
-                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-${estadoInfo.color}-100 text-${estadoInfo.color}-700`}>
+                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${estadoInfo.color}`}>
                             <Icon className="h-3 w-3" />
                             {estadoInfo.label}
                           </span>
@@ -179,14 +226,24 @@ function OrdersPage() {
                               minute: '2-digit'
                             })}
                           </p>
-                          <p>
-                            <span className="font-medium">Dirección:</span>{' '}
-                            {pedido.direccion_entrega || 'No especificada'}
-                          </p>
-                          {pedido.comentarios && (
-                            <p>
-                              <span className="font-medium">Comentarios:</span>{' '}
-                              {pedido.comentarios}
+
+                          {/* Dirección separada */}
+                          {obsData.direccion && (
+                            <p className="flex items-start gap-1">
+                              <MapPin className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <span>
+                                <span className="font-medium">Dirección:</span> {obsData.direccion}
+                              </span>
+                            </p>
+                          )}
+
+                          {/* Comentarios separados */}
+                          {obsData.comentarios && (
+                            <p className="flex items-start gap-1">
+                              <MessageSquare className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                              <span>
+                                <span className="font-medium">Comentarios:</span> {obsData.comentarios}
+                              </span>
                             </p>
                           )}
                         </div>
@@ -201,20 +258,22 @@ function OrdersPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleVerDetalles(pedido)}
-                            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center gap-1"
                           >
+                            <Eye className="h-4 w-4" />
                             Ver detalles
                           </button>
 
-                          {pedido.estado !== 'Entregado' && pedido.estado !== 'Anulado' && (
+                          {pedido.id_estado_actual !== 6 && (
                             <div className="relative">
                               <select
-                                value={pedido.estado}
-                                onChange={(e) => handleCambiarEstado(pedido.id_pedido, e.target.value)}
-                                className="appearance-none bg-green-600 text-white px-4 py-2 pr-8 rounded-lg text-sm font-medium cursor-pointer hover:bg-green-700 transition-colors"
+                                value={pedido.id_estado_actual}
+                                onChange={(e) => handleCambiarEstado(pedido.id_pedido, parseInt(e.target.value))}
+                                disabled={updatingId === pedido.id_pedido}
+                                className="appearance-none bg-green-600 text-white px-4 py-2 pr-8 rounded-lg text-sm font-medium cursor-pointer hover:bg-green-700 transition-colors disabled:opacity-50"
                               >
-                                {ESTADOS.filter(e => isAdmin || (e.value !== 'Entregado' && e.value !== 'Anulado')).map(e => (
-                                  <option key={e.value} value={e.value}>{e.label}</option>
+                                {Object.entries(ESTADOS).map(([id, estado]) => (
+                                  <option key={id} value={id}>{estado.label}</option>
                                 ))}
                               </select>
                               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white pointer-events-none" />
@@ -228,45 +287,119 @@ function OrdersPage() {
               );
             })}
           </div>
-        )}
 
-        {/* Modal de detalles */}
-        {pedidoSeleccionado && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6 border-b">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">
-                    Pedido #{pedidoSeleccionado.id_pedido}
-                  </h2>
-                  <button
-                    onClick={() => setPedidoSeleccionado(null)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ✕
-                  </button>
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 bg-white p-4 rounded-lg shadow">
+              <p className="text-sm text-gray-600">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} pedidos
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-green-600 text-white'
+                            : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 rounded-lg border hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal de detalles */}
+      {pedidoSeleccionado && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">
+                  {pedidoSeleccionado.codigo_pedido || `Pedido #${pedidoSeleccionado.id_pedido}`}
+                </h2>
+                <button
+                  onClick={() => setPedidoSeleccionado(null)}
+                  className="text-gray-500 hover:text-gray-700 p-1"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Info del cliente y entrega */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h3 className="font-semibold mb-2">Datos del cliente</h3>
+                <p className="text-sm">
+                  {pedidoSeleccionado.clientes?.nombre} {pedidoSeleccionado.clientes?.apellido}
+                </p>
+                <p className="text-sm text-gray-600">{pedidoSeleccionado.clientes?.email}</p>
+                <p className="text-sm text-gray-600">{pedidoSeleccionado.clientes?.telefono}</p>
+
+                {(() => {
+                  const obsData = parseObservaciones(pedidoSeleccionado.observaciones_cliente);
+                  return (
+                    <>
+                      {obsData.direccion && (
+                        <p className="text-sm text-gray-600 mt-2">
+                          <span className="font-medium">Dirección de entrega:</span> {obsData.direccion}
+                        </p>
+                      )}
+                      {obsData.comentarios && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          <span className="font-medium">Comentarios:</span> {obsData.comentarios}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
-              <div className="p-6">
-                {/* Info del cliente */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <h3 className="font-semibold mb-2">Datos del cliente</h3>
-                  <p className="text-sm">
-                    {pedidoSeleccionado.clientes?.nombre} {pedidoSeleccionado.clientes?.apellido}
-                  </p>
-                  <p className="text-sm text-gray-600">{pedidoSeleccionado.clientes?.email}</p>
-                  <p className="text-sm text-gray-600">{pedidoSeleccionado.clientes?.telefono}</p>
-                  <p className="text-sm text-gray-600 mt-2">
-                    <span className="font-medium">Dirección:</span> {pedidoSeleccionado.direccion_entrega}
-                  </p>
-                </div>
-
-                {/* Productos */}
-                <h3 className="font-semibold mb-3">Productos</h3>
-                <div className="space-y-3">
-                  {detalles.map((detalle) => (
-                    <div key={detalle.id_detalle} className="flex items-center gap-4 py-3 border-b">
+              {/* Productos */}
+              <h3 className="font-semibold mb-3">Productos</h3>
+              <div className="space-y-3">
+                {detalles.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">Cargando productos...</p>
+                ) : (
+                  detalles.map((detalle, idx) => (
+                    <div key={detalle.id_detalle || idx} className="flex items-center gap-4 py-3 border-b">
                       <img
                         src={detalle.productos?.imagen_url || 'https://via.placeholder.com/50'}
                         alt={detalle.productos?.nombre}
@@ -275,26 +408,26 @@ function OrdersPage() {
                       <div className="flex-1">
                         <p className="font-medium">{detalle.productos?.nombre}</p>
                         <p className="text-sm text-gray-500">
-                          {detalle.cantidad} x {formatPrice(detalle.precio_unitario)}
+                          {detalle.cantidad} x {formatPrice(detalle.precio_historico)}
                         </p>
                       </div>
-                      <p className="font-semibold">{formatPrice(detalle.subtotal)}</p>
+                      <p className="font-semibold">{formatPrice(detalle.precio_historico * detalle.cantidad)}</p>
                     </div>
-                  ))}
-                </div>
+                  ))
+                )}
+              </div>
 
-                {/* Total */}
-                <div className="border-t mt-4 pt-4 flex justify-between items-center">
-                  <span className="text-lg font-semibold">Total</span>
-                  <span className="text-2xl font-bold text-green-600">
-                    {formatPrice(pedidoSeleccionado.total)}
-                  </span>
-                </div>
+              {/* Total */}
+              <div className="border-t mt-4 pt-4 flex justify-between items-center">
+                <span className="text-lg font-semibold">Total</span>
+                <span className="text-2xl font-bold text-green-600">
+                  {formatPrice(pedidoSeleccionado.total)}
+                </span>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

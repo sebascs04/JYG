@@ -22,7 +22,9 @@
       "Bash(ping:*)",
       "Bash(timeout /t 6 /nobreak)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git fetch:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

@@ -47,15 +47,15 @@ function Footer() {
             <ul className="space-y-2">
               <li className="flex items-center space-x-2 text-sm">
                 <Phone className="h-4 w-4" />
-                <span>+57 300 123 4567</span>
+                <span>+51 999 123 456</span>
               </li>
               <li className="flex items-center space-x-2 text-sm">
                 <Mail className="h-4 w-4" />
-                <span>info@rapidosyplumosos.com</span>
+                <span>info@jyg.com.pe</span>
               </li>
               <li className="flex items-center space-x-2 text-sm">
                 <MapPin className="h-4 w-4" />
-                <span>Bogotá, Colombia</span>
+                <span>Lima, Perú</span>
               </li>
             </ul>
           </div>

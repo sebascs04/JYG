@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, LogIn } from 'lucide-react';
 import { useCartStore } from '../../../store/useCartStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
 import { formatPrice } from '../../../utils/formatters';
@@ -8,6 +10,16 @@ import { formatPrice } from '../../../utils/formatters';
 function CartPage() {
   const navigate = useNavigate();
   const { items, removeItem, updateQuantity, getSubtotal, getIGV, getTotalPrice } = useCartStore();
+  const { isAuthenticated } = useAuthStore();
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      setShowLoginAlert(true);
+      return;
+    }
+    navigate('/checkout');
+  };
 
   const subtotal = getSubtotal();
   const igv = getIGV();
@@ -147,7 +159,7 @@ function CartPage() {
               <Card.Footer>
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={() => navigate('/checkout')}
+                  onClick={handleCheckout}
                 >
                   Proceder al pago
                 </Button>
@@ -161,6 +173,37 @@ function CartPage() {
             </Card>
           </div>
         </div>
+
+        {/* Modal de login requerido */}
+        {showLoginAlert && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 text-center">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <LogIn className="h-8 w-8 text-yellow-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Inicia sesión para continuar
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Para realizar una compra necesitas tener una cuenta. Inicia sesión o regístrate para continuar.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  onClick={() => navigate('/login', { state: { from: '/checkout' } })}
+                >
+                  Iniciar sesión
+                </Button>
+                <button
+                  onClick={() => setShowLoginAlert(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  Seguir viendo el carrito
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }
