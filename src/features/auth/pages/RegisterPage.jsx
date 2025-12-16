@@ -2,13 +2,12 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { register as registerApi } from '../../../api/auth.service';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
 function RegisterPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { register: registerUser } = useAuthStore();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,16 +20,34 @@ function RegisterPage() {
 
   const password = watch('password');
 
+  // Validación de contraseña segura (8 chars, 1 número, 1 mayúscula)
+  const validatePassword = (value) => {
+    if (value.length < 8) return 'Mínimo 8 caracteres';
+    if (!/[A-Z]/.test(value)) return 'Debe contener al menos una mayúscula';
+    if (!/[0-9]/.test(value)) return 'Debe contener al menos un número';
+    return true;
+  };
+
   const onSubmit = async (data) => {
     setError('');
     setIsLoading(true);
 
     try {
-      const response = await registerApi(data);
-      login(response.user, response.token);
+      await registerUser({
+        nombre: data.nombre,
+        apellido: data.apellido,
+        email: data.email,
+        telefono: data.telefono,
+        direccion: data.direccion,
+        password: data.password,
+      });
       navigate('/catalog');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al registrarse');
+      if (err.message?.includes('already registered')) {
+        setError('Este correo ya está registrado');
+      } else {
+        setError(err.message || 'Error al registrarse');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -43,18 +60,27 @@ function RegisterPage() {
       </h2>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">
+        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Input
-          label="Nombre completo"
-          placeholder="Juan Pérez"
-          error={errors.name?.message}
-          {...register('name', { required: 'El nombre es requerido' })}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Nombres"
+            placeholder="Juan"
+            error={errors.nombre?.message}
+            {...register('nombre', { required: 'El nombre es requerido' })}
+          />
+
+          <Input
+            label="Apellidos"
+            placeholder="Pérez García"
+            error={errors.apellido?.message}
+            {...register('apellido', { required: 'El apellido es requerido' })}
+          />
+        </div>
 
         <Input
           label="Correo electrónico"
@@ -73,15 +99,22 @@ function RegisterPage() {
         <Input
           label="Teléfono"
           type="tel"
-          placeholder="300 123 4567"
-          error={errors.phone?.message}
-          {...register('phone', {
+          placeholder="987654321"
+          error={errors.telefono?.message}
+          {...register('telefono', {
             required: 'El teléfono es requerido',
             pattern: {
-              value: /^[0-9]{10}$/,
-              message: 'Teléfono inválido (10 dígitos)',
+              value: /^[0-9]{9}$/,
+              message: 'Teléfono inválido (9 dígitos)',
             },
           })}
+        />
+
+        <Input
+          label="Dirección de entrega"
+          placeholder="Av. Principal 123, Lima"
+          error={errors.direccion?.message}
+          {...register('direccion', { required: 'La dirección es requerida' })}
         />
 
         <Input
@@ -91,12 +124,12 @@ function RegisterPage() {
           error={errors.password?.message}
           {...register('password', {
             required: 'La contraseña es requerida',
-            minLength: {
-              value: 8,
-              message: 'Mínimo 8 caracteres',
-            },
+            validate: validatePassword,
           })}
         />
+        <p className="text-xs text-gray-500 -mt-2">
+          Mínimo 8 caracteres, 1 mayúscula y 1 número
+        </p>
 
         <Input
           label="Confirmar contraseña"

@@ -7,6 +7,7 @@ import ProtectedRoute from './ProtectedRoute';
 // Auth Pages
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage';
 
 // Public Pages
 import CatalogPage from '../features/catalog/pages/CatalogPage';
@@ -28,6 +29,7 @@ function AppRoutes() {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
 
       {/* Catalog Page (Standalone with custom header) */}

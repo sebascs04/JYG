@@ -137,16 +137,31 @@ export const useAuthStore = create((set, get) => ({
     if (authError) throw authError;
 
     // 2. Insertar en tabla CLIENTES
-    const { error: dbError } = await supabase.from('clientes').insert([{
+    const { data: cliente, error: dbError } = await supabase.from('clientes').insert([{
       nombre: datos.nombre,
       apellido: datos.apellido,
       email: datos.email,
       telefono: datos.telefono,
-      password_hash: authData.user.id, // Referencia
+      direccion: datos.direccion,
+      password_hash: authData.user.id,
       fecha_registro: new Date().toISOString()
-    }]);
-    
+    }]).select().single();
+
     if (dbError) throw dbError;
+
+    // 3. Actualizar estado con el nuevo usuario
+    set({
+      user: {
+        ...cliente,
+        id: authData.user.id,
+        id_cliente: cliente.id_cliente,
+        role: 'customer'
+      },
+      session: authData.session,
+      isAuthenticated: true,
+      isLoading: false
+    });
+
     return authData;
   },
 

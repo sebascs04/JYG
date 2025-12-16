@@ -96,12 +96,19 @@ function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-600">
-        ¿No tienes cuenta?{' '}
-        <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
-          Regístrate aquí
-        </Link>
-      </p>
+      <div className="mt-4 text-center text-sm text-gray-600 space-y-2">
+        <p>
+          ¿No tienes cuenta?{' '}
+          <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
+            Regístrate aquí
+          </Link>
+        </p>
+        <p>
+          <Link to="/forgot-password" className="text-gray-500 hover:text-primary-600 text-xs">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
