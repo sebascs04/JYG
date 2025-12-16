@@ -24,7 +24,9 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(git fetch:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run deploy:*)"
     ],
     "deny": [],
     "ask": []
