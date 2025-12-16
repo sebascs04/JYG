@@ -56,12 +56,32 @@ export const useCartStore = create(
 
       clearCart: () => set({ items: [] }),
 
-      getTotalPrice: () => {
-        return get().items.reduce((total, item) => total + (item.precio_unitario * item.cantidad), 0);
+      // Subtotal sin IGV
+      getSubtotal: () => {
+        return get().items.reduce((total, item) => {
+          const precio = item.precio_unitario || item.price || 0;
+          const cantidad = item.cantidad || item.quantity || 0;
+          return total + (precio * cantidad);
+        }, 0);
       },
-      
+
+      // IGV (18%)
+      getIGV: () => {
+        return get().getSubtotal() * 0.18;
+      },
+
+      // Total con IGV
+      getTotalPrice: () => {
+        const subtotal = get().getSubtotal();
+        const igv = subtotal * 0.18;
+        return subtotal + igv;
+      },
+
       getTotalItems: () => {
-        return get().items.reduce((total, item) => total + item.cantidad, 0);
+        return get().items.reduce((total, item) => {
+          const cantidad = item.cantidad || item.quantity || 0;
+          return total + cantidad;
+        }, 0);
       }
     }),
     { name: 'carrito-jyg' }

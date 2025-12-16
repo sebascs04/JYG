@@ -1,11 +1,11 @@
 /**
  * Format price to currency
  * @param {number} price - Price to format
- * @param {string} currency - Currency code (default: 'USD')
+ * @param {string} currency - Currency code (default: 'PEN' - Soles peruanos)
  * @returns {string} Formatted price
  */
-export const formatPrice = (price, currency = 'USD') => {
-  return new Intl.NumberFormat('es-ES', {
+export const formatPrice = (price, currency = 'PEN') => {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
     currency: currency,
   }).format(price);

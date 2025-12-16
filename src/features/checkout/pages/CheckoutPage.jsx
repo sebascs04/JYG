@@ -7,12 +7,11 @@ import { supabase } from '../../../lib/supabase';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Card from '../../../components/ui/Card';
-import Header from '../../../components/layout/Header';
 import { formatPrice } from '../../../utils/formatters';
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  const { items, getTotalPrice, clearCart } = useCartStore();
+  const { items, getSubtotal, getIGV, getTotalPrice, clearCart } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +42,8 @@ function CheckoutPage() {
     }
   }, [items, navigate]);
 
+  const subtotal = getSubtotal();
+  const igv = getIGV();
   const total = getTotalPrice();
 
   const onSubmitStep1 = (data) => {
@@ -121,10 +122,7 @@ function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">
           {step === 1 ? 'Datos de Envío' : 'Confirmar Pedido'}
         </h1>
@@ -302,14 +300,18 @@ function CheckoutPage() {
                     </div>
                   ))}
 
-                  <div className="border-t pt-3 mt-3">
+                  <div className="border-t pt-3 mt-3 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span>{formatPrice(total)}</span>
+                      <span>{formatPrice(subtotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
+                      <span>IGV (18%)</span>
+                      <span>{formatPrice(igv)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-green-600">
                       <span>Envío</span>
-                      <span className="text-green-600">Gratis</span>
+                      <span>Gratis</span>
                     </div>
                   </div>
 
@@ -318,13 +320,13 @@ function CheckoutPage() {
                       <span>Total</span>
                       <span className="text-green-600">{formatPrice(total)}</span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">Incluye IGV</p>
                   </div>
                 </div>
               </Card.Body>
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

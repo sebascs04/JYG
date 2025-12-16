@@ -3,42 +3,37 @@ import { Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { useCartStore } from '../../../store/useCartStore';
 import Button from '../../../components/ui/Button';
 import Card from '../../../components/ui/Card';
-import Header from '../../../components/layout/Header';
 import { formatPrice } from '../../../utils/formatters';
 
 function CartPage() {
   const navigate = useNavigate();
-  const { items, removeItem, updateQuantity, getTotalPrice } = useCartStore();
+  const { items, removeItem, updateQuantity, getSubtotal, getIGV, getTotalPrice } = useCartStore();
 
+  const subtotal = getSubtotal();
+  const igv = getIGV();
   const total = getTotalPrice();
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-12">
-            <ShoppingBag className="h-20 w-20 text-gray-300 mx-auto mb-6" />
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Tu carrito está vacío
-            </h1>
-            <p className="text-gray-600 mb-8">
-              Agrega productos desde el catálogo para comenzar
-            </p>
-            <Button onClick={() => navigate('/catalog')}>
-              Ir al catálogo
-            </Button>
-          </div>
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
+        <div className="bg-white rounded-2xl shadow-lg p-12">
+          <ShoppingBag className="h-20 w-20 text-gray-300 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Tu carrito está vacío
+          </h1>
+          <p className="text-gray-600 mb-8">
+            Agrega productos desde el catálogo para comenzar
+          </p>
+          <Button onClick={() => navigate('/catalog')}>
+            Ir al catálogo
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Carrito de Compras</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -125,10 +120,14 @@ function CartPage() {
                     );
                   })}
 
-                  <div className="border-t pt-3 mt-3">
+                  <div className="border-t pt-3 mt-3 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span>{formatPrice(total)}</span>
+                      <span>{formatPrice(subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>IGV (18%)</span>
+                      <span>{formatPrice(igv)}</span>
                     </div>
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Envío</span>
@@ -141,6 +140,7 @@ function CartPage() {
                       <span>Total</span>
                       <span className="text-green-600">{formatPrice(total)}</span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-1">Incluye IGV</p>
                   </div>
                 </div>
               </Card.Body>
@@ -161,7 +161,6 @@ function CartPage() {
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }
