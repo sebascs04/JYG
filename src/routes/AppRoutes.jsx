@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import AuthLayout from '../layouts/AuthLayout';
@@ -23,64 +23,7 @@ import InventoryPage from '../features/admin/pages/InventoryPage';
 import DispatchPage from '../features/admin/pages/DispatchPage';
 import DeliveryPage from '../features/admin/pages/DeliveryPage';
 
-function AppRoutes() {
-  return (
-    <Routes>
-      {/* Auth Routes */}
-      <Route element={<AuthLayout />}>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      </Route>
-
-      {/* Catalog Page (Standalone with custom header) */}
-      <Route path="/" element={<Navigate to="/catalog" replace />} />
-      <Route path="/catalog" element={<CatalogPage />} />
-
-      {/* Other Public Routes */}
-      <Route element={<PublicLayout />}>
-        <Route path="/catalog/:id" element={<ProductDetailPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/order-success" element={<OrderSuccessPage />} />
-      </Route>
-
-      {/* Admin Routes - Solo Admin (todo) */}
-      <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dashboard" element={<DashboardPage />} />
-          <Route path="/admin/inventory" element={<InventoryPage />} />
-        </Route>
-      </Route>
-
-      {/* Admin Routes - Recepcionista (pedidos) */}
-      <Route element={<ProtectedRoute allowedRoles={['admin', 'recepcionista']} />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/orders" element={<OrdersPage />} />
-        </Route>
-      </Route>
-
-      {/* Admin Routes - Despachador (despacho) */}
-      <Route element={<ProtectedRoute allowedRoles={['admin', 'despachador']} />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/dispatch" element={<DispatchPage />} />
-        </Route>
-      </Route>
-
-      {/* Admin Routes - Repartidor (entregas) */}
-      <Route element={<ProtectedRoute allowedRoles={['admin', 'repartidor']} />}>
-        <Route element={<AdminLayout />}>
-          <Route path="/admin/delivery" element={<DeliveryPage />} />
-        </Route>
-      </Route>
-
-      {/* 404 */}
-      <Route path="*" element={<LoginPage />} />
-    </Routes>
-  );
-}
-
-// Simple 404 component
+// 404 component
 function NotFoundPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -88,7 +31,7 @@ function NotFoundPage() {
         <h1 className="text-6xl font-bold text-gray-900">404</h1>
         <p className="mt-4 text-xl text-gray-600">Página no encontrada</p>
         <a
-          href="/catalog"
+          href="/JYG/catalog"
           className="mt-6 inline-block px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           Volver al catálogo
@@ -98,4 +41,80 @@ function NotFoundPage() {
   );
 }
 
-export default AppRoutes;
+export const router = createBrowserRouter([
+  // Auth Routes
+  {
+    element: <AuthLayout />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    ],
+  },
+  // Catalog Page (Standalone)
+  { path: '/', element: <Navigate to="/catalog" replace /> },
+  { path: '/catalog', element: <CatalogPage /> },
+  // Other Public Routes
+  {
+    element: <PublicLayout />,
+    children: [
+      { path: '/catalog/:id', element: <ProductDetailPage /> },
+      { path: '/cart', element: <CartPage /> },
+      { path: '/checkout', element: <CheckoutPage /> },
+      { path: '/order-success', element: <OrderSuccessPage /> },
+    ],
+  },
+  // Admin Routes - Solo Admin
+  {
+    element: <ProtectedRoute allowedRoles={['admin']} />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: '/admin/dashboard', element: <DashboardPage /> },
+          { path: '/admin/inventory', element: <InventoryPage /> },
+        ],
+      },
+    ],
+  },
+  // Admin Routes - Recepcionista
+  {
+    element: <ProtectedRoute allowedRoles={['admin', 'recepcionista']} />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: '/admin/orders', element: <OrdersPage /> },
+        ],
+      },
+    ],
+  },
+  // Admin Routes - Despachador
+  {
+    element: <ProtectedRoute allowedRoles={['admin', 'despachador']} />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: '/admin/dispatch', element: <DispatchPage /> },
+        ],
+      },
+    ],
+  },
+  // Admin Routes - Repartidor
+  {
+    element: <ProtectedRoute allowedRoles={['admin', 'repartidor']} />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: '/admin/delivery', element: <DeliveryPage /> },
+        ],
+      },
+    ],
+  },
+  // 404
+  { path: '*', element: <NotFoundPage /> },
+], {
+  basename: '/JYG',
+});
