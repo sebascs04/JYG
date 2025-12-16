@@ -37,7 +37,9 @@ function CatalogPage() {
       await loadProducts();
     } catch (error) {
       console.error('Error loading data:', error);
-      setError('No se pudieron cargar los productos. Por favor, intenta de nuevo más tarde.');
+      setError('No se pudieron cargar los productos. Verifica tu conexión.');
+      setProducts([]);
+      setCategories([]);
     } finally {
       setIsLoading(false);
     }
@@ -48,9 +50,10 @@ function CatalogPage() {
       const params = activeCategory ? { category: activeCategory } : {};
       const data = await getProducts(params);
       setProducts(data.products || []);
+      setError(null);
     } catch (error) {
       console.error('Error loading products:', error);
-      setError('Error al cargar los productos.');
+      setProducts([]);
     }
   };
 
