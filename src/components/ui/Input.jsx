@@ -1,12 +1,13 @@
+import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
-function Input({
+const Input = forwardRef(({
   label,
   error,
   className,
   type = 'text',
   ...props
-}) {
+}, ref) => {
   return (
     <div className="w-full">
       {label && (
@@ -15,6 +16,7 @@ function Input({
         </label>
       )}
       <input
+        ref={ref} // <--- ¡AQUÍ ESTÁ LA CLAVE! Conectamos la ref
         type={type}
         className={cn(
           'w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors',
@@ -28,6 +30,8 @@ function Input({
       )}
     </div>
   );
-}
+});
+
+Input.displayName = 'Input';
 
 export default Input;

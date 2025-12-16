@@ -6,55 +6,64 @@ export const useCartStore = create(
     (set, get) => ({
       items: [],
 
-      // Add item to cart
-      addItem: (product) => set((state) => {
-        const existingItem = state.items.find(item => item.id === product.id);
-        if (existingItem) {
-          return {
-            items: state.items.map(item =>
-              item.id === product.id
-                ? { ...item, quantity: item.quantity + 1 }
-                : item
-            ),
-          };
+      addItem: (producto, cantidad = 1) => {
+        const items = get().items;
+        // Usamos 'id_producto' porque así se llama en tu tabla SQL
+        const existe = items.find(p => p.id_producto === producto.id_producto);
+
+        // Validación de stock (Visual)
+        if (producto.stock_actual < cantidad) {
+          alert("Stock insuficiente para agregar esa cantidad");
+          return;
         }
-        return { items: [...state.items, { ...product, quantity: 1 }] };
+
+        if (existe) {
+          const nuevaCantidad = existe.cantidad + cantidad;
+          if (nuevaCantidad > producto.stock_actual) {
+             alert("No puedes agregar más del stock disponible");
+             return;
+          }
+          
+          set({
+            items: items.map(p => 
+              p.id_producto === producto.id_producto
+                ? { ...p, cantidad: nuevaCantidad }
+                : p
+            )
+          });
+        } else {
+          // Guardamos producto completo
+          set({ items: [...items, { ...producto, cantidad }] });
+        }
+      },
+
+      removeItem: (idProducto) => set({ 
+        items: get().items.filter(p => p.id_producto !== idProducto) 
       }),
 
-      // Remove item from cart
-      removeItem: (productId) => set((state) => ({
-        items: state.items.filter(item => item.id !== productId),
-      })),
-
-      // Update item quantity
-      updateQuantity: (productId, quantity) => set((state) => {
-        if (quantity <= 0) {
-          return { items: state.items.filter(item => item.id !== productId) };
+      updateQuantity: (idProducto, cantidad) => {
+        if (cantidad <= 0) {
+            // Si baja a 0, lo borramos
+            set({ items: get().items.filter(p => p.id_producto !== idProducto) });
+            return;
         }
-        return {
-          items: state.items.map(item =>
-            item.id === productId ? { ...item, quantity } : item
-          ),
-        };
-      }),
+        set({
+            items: get().items.map(p => 
+                p.id_producto === idProducto ? { ...p, cantidad } : p
+            )
+        });
+      },
 
-      // Clear cart
       clearCart: () => set({ items: [] }),
 
-      // Get total price
       getTotalPrice: () => {
-        const { items } = get();
-        return items.reduce((total, item) => total + (item.price * item.quantity), 0);
+        return get().items.reduce((total, item) => total + (item.precio_unitario * item.cantidad), 0);
       },
-
-      // Get total items count
+      
       getTotalItems: () => {
-        const { items } = get();
-        return items.reduce((total, item) => total + item.quantity, 0);
-      },
+        return get().items.reduce((total, item) => total + item.cantidad, 0);
+      }
     }),
-    {
-      name: 'cart-storage',
-    }
+    { name: 'carrito-jyg' }
   )
 );

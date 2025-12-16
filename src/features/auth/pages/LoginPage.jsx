@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Mail, Lock } from 'lucide-react';
-import { useAuthStore } from '../../../store/useAuthStore';
-import { login as loginApi } from '../../../api/auth.service';
+import { useAuthStore } from '../../../store/useAuthStore'; // Usamos solo el store
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, user } = useAuthStore(); // Traemos la acción login del store
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -24,11 +22,25 @@ function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await loginApi(data);
-      login(response.user, response.token);
-      navigate('/catalog');
+      // 1. Llamamos a la acción del store (que ya tiene la lógica de Supabase dentro)
+      await login(data.email, data.password);
+      
+      // 2. Obtenemos el estado actualizado directamente del store para decidir
+      // Nota: A veces React tarda un milisegundo en actualizar 'user' en el hook,
+      // así que verificamos directamente con la instancia del store o asumimos la redirección.
+      
+      const currentUser = useAuthStore.getState().user; // Truco para obtener el dato fresco al instante
+
+      // 3. Redirección inteligente según el rol
+      if (currentUser?.role === 'admin' || currentUser?.role === 'employee') {
+        navigate('/admin/inventory'); // Si es jefe, al panel
+      } else {
+        navigate('/catalog'); // Si es cliente, a comprar
+      }
+
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión');
+      console.error(err);
+      setError('Credenciales incorrectas o error de conexión');
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +53,7 @@ function LoginPage() {
       </h2>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4">
+        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm text-center">
           {error}
         </div>
       )}
@@ -79,7 +91,7 @@ function LoginPage() {
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full bg-primary-600 hover:bg-primary-700" disabled={isLoading}>
           {isLoading ? 'Iniciando sesión...' : 'Iniciar sesión'}
         </Button>
       </form>

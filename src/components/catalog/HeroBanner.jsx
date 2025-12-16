@@ -17,10 +17,7 @@ function HeroBanner() {
           <p className="text-lg text-stone-600 mb-10 max-w-md leading-relaxed">
             Descubre productos cuidadosamente seleccionados para garantizar la máxima calidad y frescura en cada compra.
           </p>
-          <button className="group inline-flex items-center gap-3 bg-luxury-olive hover:bg-luxury-olive-dark text-white font-medium px-8 py-4 rounded-full transition-all duration-500 uppercase text-sm tracking-wide">
-            <span>Explorar</span>
-            <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform duration-500" />
-          </button>
+          
         </div>
 
         {/* Right Image */}
